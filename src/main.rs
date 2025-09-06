@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use env_logger::Builder;
 use log::{LevelFilter, debug, error, info};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, exit};
@@ -40,7 +40,7 @@ enum Commands {
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 struct Config {
-    #[serde(default = "default_theme_dir")]
+    #[serde(default = "default_theme_dir", deserialize_with = "deserialize_path")]
     themes: PathBuf,
     #[serde(default = "default_signal")]
     signal: String,
@@ -53,6 +53,14 @@ fn default_theme_dir() -> PathBuf {
     PathBuf::from(format!("{}/.config/skinner/themes", home))
 }
 
+fn deserialize_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    let expanded = shellexpand::tilde(&s);
+    Ok(PathBuf::from(expanded.as_ref()))
+}
 fn default_signal() -> String {
     "URG".to_string()
 }
@@ -160,7 +168,7 @@ impl SkinnerApp {
                 info!("Sent {} to all {} processes", config.signal, name);
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                // It is expected that some commands return "not found" when no shell if active
+                // It is expected that some commands return "no process found" when no shell if active
                 debug!(
                     "Error from sending {} to {}: {}",
                     config.signal, name, stderr
