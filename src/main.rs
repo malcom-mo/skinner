@@ -242,11 +242,11 @@ function _skinner_activate_theme --on-signal {}
   if test -f "$HOME/.config/skinner/current_theme"
     set theme (cat ~/.config/skinner/current_theme)
     if test "$theme" != "off"
-        if -f "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
-            source "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
+        if test -f "$HOME/.config/skinner/themes/off/off-per-shell.sh"
+            source "$HOME/.config/skinner/themes/off/off-per-shell.sh"
         end
     end
-    if -f "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
+    if test -f "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
       source "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
     end
   end
