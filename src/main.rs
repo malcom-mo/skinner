@@ -218,6 +218,11 @@ impl SkinnerApp {
 _skinner_activate_theme() {{
   if [[ -f "$HOME/.config/skinner/current_theme" ]]; then
     theme=$(cat ~/.config/skinner/current_theme)
+    if [ "$theme" != "off" ]; then
+        if [[ -f "$HOME/.config/skinner/themes/off/off-per-shell.sh" ]]; then
+            source "$HOME/.config/skinner/themes/off/off-per-shell.sh"
+        fi
+    fi
     if [[ -f "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh" ]]; then
       source "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
     fi
@@ -236,6 +241,11 @@ trap _skinner_activate_theme {}
 function _skinner_activate_theme --on-signal {}
   if test -f "$HOME/.config/skinner/current_theme"
     set theme (cat ~/.config/skinner/current_theme)
+    if test "$theme" != "off"
+        if -f "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
+            source "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
+        end
+    end
     if -f "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
       source "$HOME/.config/skinner/themes/$theme/$theme-per-shell.sh"
     end
@@ -282,8 +292,6 @@ _skinner_activate_theme
                     info!("Deactivating current theme...");
                     let theme_dir = config.themes.join("off");
                     self.execute_global_script(&theme_dir)?;
-                    self.set_current_theme("off")?;
-                    self.send_signals(&config.signal)?;
                     info!("Theme deactivated");
                 }
 
