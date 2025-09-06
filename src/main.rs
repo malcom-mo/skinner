@@ -112,6 +112,10 @@ impl SkinnerApp {
 
     fn set_current_theme(&self, theme: &str) -> Result<(), Box<dyn std::error::Error>> {
         fs::write(&self.current_theme_file, theme)?;
+        info!(
+            "Wrote theme to {}",
+            self.current_theme_file.to_string_lossy()
+        );
         Ok(())
     }
 
@@ -143,56 +147,47 @@ impl SkinnerApp {
         Ok(())
     }
 
-    fn send_signals(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let config = self.load_config()?;
+    fn send_signals(&self, signal: &String) -> Result<(), Box<dyn std::error::Error>> {
         // login shells are often prefixed with -
         let shell_names = ["zsh", "bash", "fish", "-zsh", "-bash", "-fish"];
         for name in shell_names {
             let output = match Command::new("killall")
-                .arg(format!("-{}", config.signal))
+                .arg(format!("-{}", signal))
                 .arg("--")
                 .arg(format!("{}", name))
                 .output()
             {
                 Ok(output) => output,
                 Err(e) => {
-                    error!(
-                        "Could not run killall -{} -- {}: {}",
-                        config.signal, name, e
-                    );
+                    error!("Could not run killall -{} -- {}: {}", signal, name, e);
                     continue;
                 }
             };
 
             if output.status.success() {
-                info!("Sent {} to all {} processes", config.signal, name);
+                info!("Sent {} to all {} processes", signal, name);
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 // It is expected that some commands return "no process found" when no shell if active
-                debug!(
-                    "Error from sending {} to {}: {}",
-                    config.signal, name, stderr
-                );
+                debug!("Error from sending {} to {}: {}", signal, name, stderr);
             }
         }
 
         Ok(())
     }
 
-    fn list_themes(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-        let config = self.load_config()?;
-
-        if !config.themes.exists() {
+    fn list_themes(&self, themes_dir: PathBuf) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        if !themes_dir.exists() {
             info!(
                 "Themes directory {} not found",
-                config.themes.to_string_lossy()
+                themes_dir.to_string_lossy()
             );
             return Ok(Vec::new());
         }
 
         let mut themes = Vec::new();
 
-        for entry in fs::read_dir(&config.themes)? {
+        for entry in fs::read_dir(&themes_dir)? {
             let entry = entry?;
             let path = entry.path();
 
@@ -217,8 +212,7 @@ impl SkinnerApp {
         Ok(themes)
     }
 
-    fn setup_bash(&self) -> Result<String, Box<dyn std::error::Error>> {
-        let config = self.load_config()?;
+    fn setup_bash(&self, signal: String) -> Result<String, Box<dyn std::error::Error>> {
         Ok(format!(
             r#"# --- Added by skinner ---
 _skinner_activate_theme() {{
@@ -232,12 +226,11 @@ _skinner_activate_theme() {{
 _skinner_activate_theme
 trap _skinner_activate_theme {}
 # --- End skinner ---"#,
-            config.signal
+            signal
         ))
     }
 
-    fn setup_fish(&self) -> Result<String, Box<dyn std::error::Error>> {
-        let config = self.load_config()?;
+    fn setup_fish(&self, signal: String) -> Result<String, Box<dyn std::error::Error>> {
         Ok(format!(
             r#"# --- Added by skinner ---
 function _skinner_activate_theme --on-signal {}
@@ -250,18 +243,19 @@ function _skinner_activate_theme --on-signal {}
 end
 _skinner_activate_theme
 # --- End skinner ---"#,
-            config.signal
+            signal
         ))
     }
 
     fn run(&self, command: Commands) -> Result<(), Box<dyn std::error::Error>> {
         match command {
             Commands::Setup { fish } => {
+                let config = self.load_config()?;
                 if fish {
-                    println!("{}", self.setup_fish()?);
+                    println!("{}", self.setup_fish(config.signal)?);
                 } else {
                     // zsh or bash
-                    println!("{}", self.setup_bash()?);
+                    println!("{}", self.setup_bash(config.signal)?);
                 }
             }
 
@@ -274,16 +268,6 @@ _skinner_activate_theme
             Commands::Activate { theme } => {
                 let config = self.load_config()?;
 
-                // If not "off", first deactivate current theme
-                if theme != "off" {
-                    let current = self.get_current_theme()?;
-                    if current != "off" {
-                        self.run(Commands::Activate {
-                            theme: "off".to_string(),
-                        })?;
-                    }
-                }
-
                 let actual_theme = match theme.as_str() {
                     "light" => config
                         .light
@@ -293,21 +277,26 @@ _skinner_activate_theme
                         .ok_or("No dark theme configured in skinner.conf")?,
                     _ => theme,
                 };
+
+                if actual_theme != "off" {
+                    info!("Deactivating current theme...");
+                    let theme_dir = config.themes.join("off");
+                    self.execute_global_script(&theme_dir)?;
+                    self.set_current_theme("off")?;
+                    self.send_signals(&config.signal)?;
+                    info!("Theme deactivated");
+                }
+
                 let theme_dir = config.themes.join(&actual_theme);
                 self.execute_global_script(&theme_dir)?;
-
                 self.set_current_theme(&actual_theme)?;
-                self.send_signals()?;
-
-                if actual_theme == "off" {
-                    info!("Theme deactivated");
-                } else {
-                    info!("Activated theme: {}", actual_theme);
-                }
+                self.send_signals(&config.signal)?;
+                info!("Activated theme: {}", actual_theme);
             }
 
             Commands::List => {
-                let themes = self.list_themes()?;
+                let config = self.load_config()?;
+                let themes = self.list_themes(config.themes)?;
                 let current = self.get_current_theme()?;
 
                 if themes.is_empty() {
