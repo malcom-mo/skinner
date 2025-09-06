@@ -8,10 +8,8 @@ func switch_theme() -> Int32 {
     let appearance = NSApplication.shared.effectiveAppearance.name.rawValue.lowercased()
     if appearance.contains("dark") {
         task.arguments = ["activate", "dark"]
-    } else if appearance.contains("light") {
-        task.arguments = ["activate", "light"]
     } else {
-        return 0
+        task.arguments = ["activate", "light"]
     }
 
     task.environment = ProcessInfo.processInfo.environment
