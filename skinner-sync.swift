@@ -1,30 +1,26 @@
 import Cocoa
 
 @discardableResult
-func shell(_ args: [String]) -> Int32 {
+func switch_theme() -> Int32 {
     let task = Process()
-    let appearance = NSApplication.shared.effectiveAppearance.name.rawValue.lowercased()
-    let env = ProcessInfo.processInfo.environment
+    task.launchPath = "/opt/homebrew/bin/skinner"
 
-    // Switch theme based on system appearance
+    let appearance = NSApplication.shared.effectiveAppearance.name.rawValue.lowercased()
     if appearance.contains("dark") {
-        task.launchPath = "/usr/bin/env"
-        task.arguments = ["skinner", "activate", "dark"]
+        task.arguments = ["activate", "dark"]
     } else if appearance.contains("light") {
-        task.launchPath = "/usr/bin/env"
-        task.arguments = ["skinner", "activate", "light"]
+        task.arguments = ["activate", "light"]
     } else {
         return 0
     }
 
-    task.environment = env
+    task.environment = ProcessInfo.processInfo.environment
     task.launch()
     task.waitUntilExit()
     return task.terminationStatus
 }
 
-let args = Array(CommandLine.arguments.suffix(from: 1))
-shell(args)
+switch_theme()
 
 DistributedNotificationCenter.default.addObserver(
     forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
@@ -34,7 +30,7 @@ DistributedNotificationCenter.default.addObserver(
     DispatchQueue.main.asyncAfter(
         deadline: DispatchTime.now(),
         execute: {
-            shell(args)
+            switch_theme()
         })
 }
 
@@ -43,7 +39,7 @@ NSWorkspace.shared.notificationCenter.addObserver(
     object: nil,
     queue: nil
 ) { (notification) in
-    shell(args)
+    switch_theme()
 }
 
 NSApplication.shared.run()
