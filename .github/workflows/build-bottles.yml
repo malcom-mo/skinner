@@ -31,8 +31,9 @@ jobs:
 
       - name: Modify formula for local build
         run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
           FORMULA_FILE="$(/opt/homebrew/bin/brew --repository malcom-mo/tap)/Formula/skinner.rb"
-          cp "$FORMULA_FILE" "$FORMULA_FILE.backup"
+          sed -i "" "s|^  version \".*\"|  version \"$VERSION\"|" "$FORMULA_FILE"
           sed -i.bak 's|^  url .*|  url "file://'"$(pwd)"'/tarball/repo.tar.gz"|' "$FORMULA_FILE"
           sed -i.bak '/^  sha256/d' "$FORMULA_FILE"
 
