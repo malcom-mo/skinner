@@ -72,18 +72,40 @@ jobs:
           path: bottles
           merge-multiple: true
 
+      - name: Download bottle artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: json-*
+          path: json
+          merge-multiple: true
+
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
 
+          # Translate local filenames to release filenames according to the bottle JSON file
+          mkdir tmpdir
+          for json in json/*.json; do
+              jq -r '
+                  .[] |
+                  .bottle.tags |
+                  to_entries[] |
+                  .value |
+                  select(has("filename") and has("local_filename")) |
+                  "\(.local_filename) \(.filename)"
+              ' "$json" 2>/dev/null | while read local release; do
+                  mv "bottles/$local" "tmpdir/$release"
+              done
+          done
+
           gh release create "$VERSION" \
             --title "Release $VERSION" \
             --notes "Automated release for $VERSION" \
             --draft=false \
             --prerelease=false \
-            bottles/*.tar.gz
+            tmpdir/*
 
   update-formula:
     needs: [build-bottles, release]
