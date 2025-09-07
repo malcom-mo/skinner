@@ -1,0 +1,143 @@
+name: Build and release Homebrew Bottles
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-bottles:
+    strategy:
+      matrix:
+        os:
+          - macos-14 # Sonoma
+          - macos-15 # Sequoia
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create source tarball
+        run: |
+          mkdir -p tarball
+          tar -czf tarball/repo.tar.gz --exclude='.git' --exclude='tarball' .
+
+      - name: Get tap and formula
+        run: |
+          /opt/homebrew/bin/brew tap malcom-mo/tap
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.RELEASE_PAT }}
+
+      - name: Modify formula for local build
+        run: |
+          FORMULA_FILE="$(/opt/homebrew/bin/brew --repository malcom-mo/tap)/Formula/skinner.rb"
+          cp "$FORMULA_FILE" "$FORMULA_FILE.backup"
+          sed -i.bak 's|^  url .*|  url "file://'"$(pwd)"'/tarball/repo.tar.gz"|' "$FORMULA_FILE"
+          sed -i.bak '/^  sha256/d' "$FORMULA_FILE"
+
+      - name: Build bottle
+        run: |
+          /opt/homebrew/bin/brew install --build-bottle skinner
+          /opt/homebrew/bin/brew bottle --json --root-url https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF#refs/tags/} skinner
+
+      - name: Upload bottle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bottle-${{ matrix.os }}
+          path: |
+            skinner--*bottle*.tar.gz
+          retention-days: 1
+
+      - name: Upload json artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: json-${{ matrix.os }}
+          path: |
+            skinner--*bottle.json
+          retention-days: 1
+
+  release:
+    needs: build-bottles
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download bottles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bottle-*
+          path: bottles
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+
+          gh release create "$VERSION" \
+            --title "Release $VERSION" \
+            --notes "Automated release for $VERSION" \
+            --draft=false \
+            --prerelease=false \
+            bottles/*.tar.gz
+
+  update-formula:
+    needs: [build-bottles, release]
+    runs-on: macos-15
+
+    steps:
+      - name: Get tap and formula
+        run: |
+          /opt/homebrew/bin/brew tap malcom-mo/tap
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.RELEASE_PAT }}
+
+      - name: Checkout source repository  
+        uses: actions/checkout@v4
+        with:
+          path: source-repo
+
+      - name: Download bottle artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: json-*
+          path: json
+          merge-multiple: true
+
+      - name: Update the formula
+        run: |
+          FORMULA_FILE="$(/opt/homebrew/bin/brew --repository malcom-mo/tap)"/Formula/skinner.rb
+
+          # Add bottles
+          /opt/homebrew/bin/brew bottle --merge --write --no-commit json/*.bottle.json
+
+          # Update URL
+          VERSION=${GITHUB_REF#refs/tags/}
+          TARBALL_URL="https://github.com/${{ github.repository }}/archive/refs/tags/$VERSION.tar.gz"
+          sed -i "" "s|^  url \".*\"|  url \"$TARBALL_URL\"|" "$FORMULA_FILE"
+
+          # Update or add SHA256
+          TARBALL_SHA=$(tar -czf - -C source-repo --exclude='.git' . | sha256sum | cut -d' ' -f1)
+          if grep -q "^  sha256" "$FORMULA_FILE"; then
+            sed -i "" "s/^  sha256 \".*\"/  sha256 \"$TARBALL_SHA\"/" "$FORMULA_FILE"
+          else
+            sed -i "" "/^  url \".*\"/s/$/\n  sha256 \"$TARBALL_SHA\"/" "$FORMULA_FILE"
+          fi
+
+          # Update version
+          VERSION=${VERSION#v}
+          sed -i "" "s|^  version \".*\"|  version \"$VERSION\"|" "$FORMULA_FILE"
+
+      - name: Commit and push changes
+        run: |
+          cd "$(/opt/homebrew/bin/brew --repository malcom-mo/tap)"
+          git remote set-url origin https://x-access-token:${{ secrets.RELEASE_PAT }}@github.com/malcom-mo/homebrew-tap.git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/skinner.rb
+          git commit -m "Update skinner to ${GITHUB_REF#refs/tags/}"
+          git push -u origin main
