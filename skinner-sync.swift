@@ -33,7 +33,7 @@ DistributedNotificationCenter.default.addObserver(
 }
 
 NSWorkspace.shared.notificationCenter.addObserver(
-    forName: NSWorkspace.didWakeNotification,
+    forName: NSWorkspace.screensDidWakeNotification,
     object: nil,
     queue: nil
 ) { (notification) in
