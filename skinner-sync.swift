@@ -3,7 +3,7 @@ import Cocoa
 @discardableResult
 func switch_theme() -> Int32 {
     let task = Process()
-    task.launchPath = "/opt/homebrew/bin/skinner"
+    task.launchPath = "skinner"
 
     let appearance = NSApplication.shared.effectiveAppearance.name.rawValue.lowercased()
     if appearance.contains("dark") {
