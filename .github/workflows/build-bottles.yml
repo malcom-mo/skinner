@@ -11,10 +11,7 @@ jobs:
       matrix:
         os:
           - macos-13        # Ventura, x86
-          - macos-13-xlarge # Ventura, arm
-          - macos-14-large  # Sonoma, x86
           - macos-14        # Sonoma, arm
-          - macos-15-large  # Sequoia, x86
           - macos-15        # Sequoia, arm
     runs-on: ${{ matrix.os }}
 
