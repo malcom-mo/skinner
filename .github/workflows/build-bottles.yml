@@ -10,9 +10,12 @@ jobs:
     strategy:
       matrix:
         os:
-          - macos-13 # Ventura, x86
-          - macos-14 # Sonoma, arm
-          - macos-15 # Sequoia, arm
+          - macos-13        # Ventura, x86
+          - macos-13-xlarge # Ventura, arm
+          - macos-14-large  # Sonoma, x86
+          - macos-14        # Sonoma, arm
+          - macos-15-large  # Sequoia, x86
+          - macos-15        # Sequoia, arm
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -26,22 +29,22 @@ jobs:
 
       - name: Get tap and formula
         run: |
-          /opt/homebrew/bin/brew tap malcom-mo/tap
+          brew tap malcom-mo/tap
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.RELEASE_PAT }}
 
       - name: Modify formula for local build
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          FORMULA_FILE="$(/opt/homebrew/bin/brew --repository malcom-mo/tap)/Formula/skinner.rb"
+          FORMULA_FILE="$(brew --repository malcom-mo/tap)/Formula/skinner.rb"
           sed -i "" "s|^  version \".*\"|  version \"$VERSION\"|" "$FORMULA_FILE"
           sed -i.bak 's|^  url .*|  url "file://'"$(pwd)"'/tarball/repo.tar.gz"|' "$FORMULA_FILE"
           sed -i.bak '/^  sha256/d' "$FORMULA_FILE"
 
       - name: Build bottle
         run: |
-          /opt/homebrew/bin/brew install --build-bottle skinner
-          /opt/homebrew/bin/brew bottle --json --root-url https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF#refs/tags/} skinner
+          brew install --build-bottle skinner
+          brew bottle --json --root-url https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF#refs/tags/} skinner
 
       - name: Upload bottle artifact
         uses: actions/upload-artifact@v4
@@ -116,7 +119,7 @@ jobs:
     steps:
       - name: Get tap and formula
         run: |
-          /opt/homebrew/bin/brew tap malcom-mo/tap
+          brew tap malcom-mo/tap
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.RELEASE_PAT }}
 
@@ -134,10 +137,10 @@ jobs:
 
       - name: Update the formula
         run: |
-          FORMULA_FILE="$(/opt/homebrew/bin/brew --repository malcom-mo/tap)"/Formula/skinner.rb
+          FORMULA_FILE="$(brew --repository malcom-mo/tap)"/Formula/skinner.rb
 
           # Add bottles
-          /opt/homebrew/bin/brew bottle --merge --write --no-commit json/*.bottle.json
+          brew bottle --merge --write --no-commit json/*.bottle.json
 
           # Update URL
           VERSION=${GITHUB_REF#refs/tags/}
@@ -158,7 +161,7 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          cd "$(/opt/homebrew/bin/brew --repository malcom-mo/tap)"
+          cd "$(brew --repository malcom-mo/tap)"
           git remote set-url origin https://x-access-token:${{ secrets.RELEASE_PAT }}@github.com/malcom-mo/homebrew-tap.git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
