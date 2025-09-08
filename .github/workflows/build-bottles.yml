@@ -10,8 +10,9 @@ jobs:
     strategy:
       matrix:
         os:
-          - macos-14 # Sonoma
-          - macos-15 # Sequoia
+          - macos-13 # Ventura, x86
+          - macos-14 # Sonoma, arm
+          - macos-15 # Sequoia, arm
     runs-on: ${{ matrix.os }}
 
     steps:
