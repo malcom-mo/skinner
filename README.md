@@ -61,4 +61,5 @@ dark: myDarkTheme
 
 ## Related projects
 - [dark-mode-notify](https://github.com/bouk/dark-mode-notify) -- run commands when macOS changes to dark mode.
-- [nightfall](https://github.com/r-thomson/Nightfall/) -- activate macOS dark mode from the menu bar.
+  *This project includes code derived from dark-mode-notify, copyright (c) Bouke van der Bijl, licensed under the [MIT License](https://github.com/bouk/dark-mode-notify/blob/main/LICENSE).*
+- [Nightfall](https://github.com/r-thomson/Nightfall/) -- activate macOS dark mode from the menu bar.
