@@ -28,13 +28,13 @@ import Cocoa
 @discardableResult
 func switch_theme() -> Int32 {
     let task = Process()
-    task.launchPath = "skinner"
+    task.launchPath = "/usr/bin/env"
 
     let appearance = NSApplication.shared.effectiveAppearance.name.rawValue.lowercased()
     if appearance.contains("dark") {
-        task.arguments = ["activate", "dark"]
+        task.arguments = ["skinner", "activate", "dark"]
     } else {
-        task.arguments = ["activate", "light"]
+        task.arguments = ["skinner", "activate", "light"]
     }
 
     task.environment = ProcessInfo.processInfo.environment
